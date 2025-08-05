@@ -5,6 +5,7 @@ networks:
 services:
   frontend:
     image: my/ujjwal-frontend:dev
+    container_name: ujjwal-frontend
     build:
       context: ./frontend
     ports:
@@ -14,6 +15,7 @@ services:
 
   catalogue:
     image: my/ujjwal-catalogue:dev
+    container_name: ujjwal-catalogue
     build:
       context: ./catalogue
     ports:
@@ -23,6 +25,7 @@ services:
 
   catalogue-db:
     image: postgres:16.2-alpine3.19
+    container_name: ujjwal-catalogue-db
     environment:
       POSTGRES_USER: devops
       POSTGRES_PASSWORD: devops
@@ -32,6 +35,7 @@ services:
 
   recco:
     image: my/ujjwal-recco:dev
+    container_name: ujjwal-recco
     build:
       context: ./recommendation
     ports:
@@ -41,6 +45,7 @@ services:
 
   voting:
     image: my/ujjwal-voting:dev
+    container_name: ujjwal-voting
     build:
       context: ./voting
     ports:
