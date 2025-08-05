@@ -1,0 +1,51 @@
+networks:
+  ujjwal:
+    driver: bridge
+
+services:
+  frontend:
+    image: my/ujjwal-frontend:dev
+    build:
+      context: ./frontend
+    ports:
+      - "80:3000"
+    networks:
+      - ujjwal
+
+  catalogue:
+    image: my/ujjwal-catalogue:dev
+    build:
+      context: ./catalogue
+    ports:
+      - "5000:5000"
+    networks:
+      - ujjwal
+
+  catalogue-db:
+    image: postgres:16.2-alpine3.19
+    environment:
+      POSTGRES_USER: devops
+      POSTGRES_PASSWORD: devops
+      POSTGRES_DB: catalogue
+    networks:
+      - ujjwal
+
+  recco:
+    image: my/ujjwal-recco:dev
+    build:
+      context: ./recommendation
+    ports:
+      - "8080:8080"
+    networks:
+      - ujjwal
+
+  voting:
+    image: my/ujjwal-voting:dev
+    build:
+      context: ./voting
+    ports:
+      - "8081:8080"
+    depends_on: 
+      - catalogue
+    networks:
+      - ujjwal
