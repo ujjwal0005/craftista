@@ -1,0 +1,45 @@
+{{- if .Values.recommendation.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "craftista.fullname" . }}-recommendation
+  labels:
+    {{- include "craftista.labels" . | nindent 4 }}
+    app.kubernetes.io/component: recommendation
+spec:
+  replicas: {{ .Values.recommendation.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "craftista.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: recommendation
+  template:
+    metadata:
+      labels:
+        {{- include "craftista.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: recommendation
+    spec:
+      containers:
+      - name: recommendation
+        image: {{ tpl .Values.recommendation.image.repository . }}:{{ tpl .Values.recommendation.image.tag . }}
+        imagePullPolicy: {{ .Values.global.pullPolicy }}
+        ports:
+        - containerPort: {{ .Values.recommendation.service.port }}
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "craftista.fullname" . }}-recommendation
+  labels:
+    {{- include "craftista.labels" . | nindent 4 }}
+    app.kubernetes.io/component: recommendation
+spec:
+  type: {{ .Values.recommendation.service.type }}
+  ports:
+  - port: {{ .Values.recommendation.service.port }}
+    targetPort: {{ .Values.recommendation.service.port }}
+  selector:
+    {{- include "craftista.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: recommendation
+{{- end }}

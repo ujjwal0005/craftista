@@ -1,0 +1,24 @@
+global:
+  tag: dev
+
+frontend:
+  replicaCount: 1
+  ingress:
+    host: craftista-dev.local
+
+catalogue:
+  replicaCount: 1
+
+recommendation:
+  replicaCount: 1
+
+voting:
+  replicaCount: 1
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi

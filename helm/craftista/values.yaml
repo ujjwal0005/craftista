@@ -1,0 +1,74 @@
+global:
+  registry: ghcr.io
+  repository: craftista/craftista
+  tag: latest
+  pullPolicy: IfNotPresent
+
+frontend:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: "{{ .Values.global.registry }}/{{ .Values.global.repository }}-frontend"
+    tag: "{{ .Values.global.tag }}"
+  service:
+    type: ClusterIP
+    port: 3000
+  ingress:
+    enabled: true
+    className: nginx
+    host: craftista.local
+    path: /
+
+catalogue:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: "{{ .Values.global.registry }}/{{ .Values.global.repository }}-catalogue"
+    tag: "{{ .Values.global.tag }}"
+  service:
+    type: ClusterIP
+    port: 5000
+
+recommendation:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: "{{ .Values.global.registry }}/{{ .Values.global.repository }}-recommendation"
+    tag: "{{ .Values.global.tag }}"
+  service:
+    type: ClusterIP
+    port: 8080
+
+voting:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: "{{ .Values.global.registry }}/{{ .Values.global.repository }}-voting"
+    tag: "{{ .Values.global.tag }}"
+  service:
+    type: ClusterIP
+    port: 8080
+
+database:
+  enabled: true
+  image:
+    repository: postgres
+    tag: 16.2-alpine3.19
+  service:
+    port: 5432
+  env:
+    POSTGRES_USER: devops
+    POSTGRES_PASSWORD: devops
+    POSTGRES_DB: catalogue
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

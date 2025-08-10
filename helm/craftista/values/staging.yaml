@@ -1,0 +1,24 @@
+global:
+  tag: staging
+
+frontend:
+  replicaCount: 2
+  ingress:
+    host: craftista-staging.local
+
+catalogue:
+  replicaCount: 2
+
+recommendation:
+  replicaCount: 2
+
+voting:
+  replicaCount: 2
+
+resources:
+  limits:
+    cpu: 300m
+    memory: 384Mi
+  requests:
+    cpu: 150m
+    memory: 192Mi

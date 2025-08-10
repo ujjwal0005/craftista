@@ -1,0 +1,36 @@
+name: Docker Compose Deployment
+
+on:
+  workflow_run:
+    workflows: ["Craftista CI/CD Pipeline"]
+    types:
+      - completed
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Update docker-compose with new images
+      run: |
+        sed -i "s|my/ujjwal-frontend:dev|ghcr.io/${{ github.repository }}-frontend:latest|g" docker-compose.yaml
+        sed -i "s|my/ujjwal-catalogue:dev|ghcr.io/${{ github.repository }}-catalogue:latest|g" docker-compose.yaml
+        sed -i "s|my/ujjwal-recco:dev|ghcr.io/${{ github.repository }}-recommendation:latest|g" docker-compose.yaml
+        sed -i "s|my/ujjwal-voting:dev|ghcr.io/${{ github.repository }}-voting:latest|g" docker-compose.yaml
+    
+    - name: Deploy with Docker Compose
+      run: |
+        docker-compose pull
+        docker-compose up -d
+        docker-compose ps

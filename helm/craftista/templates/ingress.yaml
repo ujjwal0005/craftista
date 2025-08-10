@@ -1,0 +1,22 @@
+{{- if .Values.frontend.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "craftista.fullname" . }}-ingress
+  labels:
+    {{- include "craftista.labels" . | nindent 4 }}
+  annotations:
+    kubernetes.io/ingress.class: {{ .Values.frontend.ingress.className }}
+spec:
+  rules:
+  - host: {{ .Values.frontend.ingress.host }}
+    http:
+      paths:
+      - path: {{ .Values.frontend.ingress.path }}
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ include "craftista.fullname" . }}-frontend
+            port:
+              number: {{ .Values.frontend.service.port }}
+{{- end }}

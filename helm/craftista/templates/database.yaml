@@ -1,0 +1,50 @@
+{{- if .Values.database.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "craftista.fullname" . }}-database
+  labels:
+    {{- include "craftista.labels" . | nindent 4 }}
+    app.kubernetes.io/component: database
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "craftista.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: database
+  template:
+    metadata:
+      labels:
+        {{- include "craftista.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: database
+    spec:
+      containers:
+      - name: database
+        image: {{ .Values.database.image.repository }}:{{ .Values.database.image.tag }}
+        imagePullPolicy: {{ .Values.global.pullPolicy }}
+        ports:
+        - containerPort: {{ .Values.database.service.port }}
+        env:
+        - name: POSTGRES_USER
+          value: {{ .Values.database.env.POSTGRES_USER }}
+        - name: POSTGRES_PASSWORD
+          value: {{ .Values.database.env.POSTGRES_PASSWORD }}
+        - name: POSTGRES_DB
+          value: {{ .Values.database.env.POSTGRES_DB }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "craftista.fullname" . }}-database
+  labels:
+    {{- include "craftista.labels" . | nindent 4 }}
+    app.kubernetes.io/component: database
+spec:
+  type: ClusterIP
+  ports:
+  - port: {{ .Values.database.service.port }}
+    targetPort: {{ .Values.database.service.port }}
+  selector:
+    {{- include "craftista.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: database
+{{- end }}
