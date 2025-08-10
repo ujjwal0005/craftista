@@ -98,11 +98,10 @@ jobs:
 
       - name: Check Quality Gate
         run: |
-          for i in $(seq 1 12); do
+          for i in {1..12}; do
             echo "Checking quality gate status (attempt $i/12)..."
-            RESPONSE=$(curl -s -u "${{ secrets.SONAR_TOKEN }}:" "$URL")
             
-            # Extract only top-level projectStatus.status
+            RESPONSE=$(curl -s -u "${{ secrets.SONAR_TOKEN }}:" "$URL" || true)
             STATUS=$(echo "$RESPONSE" | grep -o '"projectStatus":{"status":"[^"]*"' | cut -d'"' -f4)
             
             if [ "$STATUS" = "OK" ]; then
@@ -118,7 +117,6 @@ jobs:
           done
           echo "Quality Gate check timed out after 2 minutes"
           exit 1
-
   # docker-build:
   #   needs: quality-gate
   #   runs-on: ubuntu-latest
