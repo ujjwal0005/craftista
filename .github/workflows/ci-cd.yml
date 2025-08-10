@@ -84,15 +84,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-name: Quality Gate
-
-on:
-  push:
-    branches:
-      - main
-  pull_request:
-
-jobs:
   quality-gate:
     runs-on: ubuntu-latest
     steps:
@@ -127,7 +118,6 @@ jobs:
           done
           echo "Quality Gate check timed out after 2 minutes"
           exit 1
-
 
   # docker-build:
   #   needs: quality-gate
