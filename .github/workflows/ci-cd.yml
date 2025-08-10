@@ -3,6 +3,8 @@ name: Craftista CI/CD Pipeline
 on:
   push:
     branches: [ main, develop ]
+    paths-ignore:
+      - 'helm/**'
   pull_request:
     branches: [ main ]
 
