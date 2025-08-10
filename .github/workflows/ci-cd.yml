@@ -84,36 +84,55 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     
-    - name: Send SonarCloud results to Slack
-      uses: 8398a7/action-slack@v3
-      with:
-        status: custom
-        custom_payload: |
-          {
-            "text": "SonarCloud Analysis Complete",
-            "attachments": [{
-              "color": "good",
-              "fields": [{
-                "title": "Project",
-                "value": "${{ env.SONAR_PROJECT }}",
-                "short": true
-              }, {
-                "title": "Repository",
-                "value": "${{ github.repository }}",
-                "short": true
-              }, {
-                "title": "Branch",
-                "value": "${{ github.ref_name }}",
-                "short": true
-              }, {
-                "title": "View Report",
-                "value": "<${{ env.SONAR_HOST }}/dashboard?id=${{ env.SONAR_PROJECT }}|SonarCloud Dashboard>",
-                "short": false
-              }]
+    - name: Get SonarCloud metrics and send to Slack
+      run: |
+        sleep 30
+        
+        METRICS=$(curl -s -u "${{ secrets.SONAR_TOKEN }}:" \
+          "${{ env.SONAR_HOST }}/api/measures/component?component=${{ env.SONAR_PROJECT }}&metricKeys=bugs,vulnerabilities,code_smells,coverage")
+        
+        BUGS=$(echo "$METRICS" | jq -r '.component.measures[] | select(.metric=="bugs") | .value // "0"')
+        VULNERABILITIES=$(echo "$METRICS" | jq -r '.component.measures[] | select(.metric=="vulnerabilities") | .value // "0"')
+        CODE_SMELLS=$(echo "$METRICS" | jq -r '.component.measures[] | select(.metric=="code_smells") | .value // "0"')
+        COVERAGE=$(echo "$METRICS" | jq -r '.component.measures[] | select(.metric=="coverage") | .value // "0"')
+        
+        if [ "$BUGS" -gt 0 ] || [ "$VULNERABILITIES" -gt 0 ]; then
+          COLOR="danger"
+        elif [ "$CODE_SMELLS" -gt 10 ]; then
+          COLOR="warning"
+        else
+          COLOR="good"
+        fi
+        
+        curl -X POST -H 'Content-type: application/json' \
+        --data "{
+          \"text\": \"📊 SonarCloud Analysis Complete\",
+          \"attachments\": [{
+            \"color\": \"$COLOR\",
+            \"fields\": [{
+              \"title\": \"🐛 Bugs\",
+              \"value\": \"$BUGS\",
+              \"short\": true
+            }, {
+              \"title\": \"🔒 Vulnerabilities\",
+              \"value\": \"$VULNERABILITIES\",
+              \"short\": true
+            }, {
+              \"title\": \"💨 Code Smells\",
+              \"value\": \"$CODE_SMELLS\",
+              \"short\": true
+            }, {
+              \"title\": \"📈 Coverage\",
+              \"value\": \"$COVERAGE%\",
+              \"short\": true
+            }, {
+              \"title\": \"📋 View Details\",
+              \"value\": \"<${{ env.SONAR_HOST }}/dashboard?id=${{ env.SONAR_PROJECT }}|SonarCloud Dashboard>\",
+              \"short\": false
             }]
-          }
-      env:
-        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          }]
+        }" \
+        ${{ secrets.SLACK_WEBHOOK_URL }}
 
   docker-build:
     needs: sonar-analysis
@@ -193,6 +212,10 @@ jobs:
               \"title\": \"🔵 Low\",
               \"value\": \"$LOW\",
               \"short\": true
+            }, {
+              \"title\": \"🔍 View Details\",
+              \"value\": \"<https://github.com/${{ github.repository }}/security/code-scanning|GitHub Security Tab>\",
+              \"short\": false
             }]
           }]
         }" \
