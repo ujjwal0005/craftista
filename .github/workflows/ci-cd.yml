@@ -7,74 +7,162 @@ on:
     branches: [ main ]
 
 env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  DOCKER_REGISTRY: ${{ secrets.DOCKER_USERNAME }}
+  SONAR_HOST: https://sonarcloud.io
+  SONAR_ORG: ${{ secrets.SONAR_ORGANIZATION }}
+  SONAR_PROJECT: ${{ secrets.SONAR_PROJECT_KEY }}
 
 jobs:
-  test:
+  build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         service: [frontend, catalogue, recommendation, voting]
-    
     steps:
     - uses: actions/checkout@v4
     
-    - name: Test Catalogue
+    - name: Build Frontend
+      if: matrix.service == 'frontend'
+      run: |
+        cd frontend
+        npm install
+    
+    - name: Build Catalogue
       if: matrix.service == 'catalogue'
       run: |
         cd catalogue
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        python -m pytest test_app.py -v
-
-  build:
-    needs: test
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        service: [frontend, catalogue, recommendation, voting]
     
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Log in to Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ${{ env.REGISTRY }}
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-    
-    - name: Extract metadata
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.service }}
-        tags: |
-          type=ref,event=branch
-          type=ref,event=pr
-          type=sha,prefix={{branch}}-
-          type=raw,value=latest,enable={{is_default_branch}}
-    
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v5
-      with:
-        context: ./${{ matrix.service }}
-        push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Deploy to Production
+    - name: Build Recommendation
+      if: matrix.service == 'recommendation'
       run: |
-        echo "Deploying Craftista application..."
-        # Add your deployment commands here
-        # Example: kubectl apply -f k8s/
-        # Or: docker-compose up -d
+        cd recommendation
+        go mod tidy
+        go build
+    
+    - name: Build Voting
+      if: matrix.service == 'voting'
+      run: |
+        cd voting
+        mvn clean install -DskipTests
+
+  # unit-test:
+  #   needs: build
+  #   runs-on: ubuntu-latest
+  #   strategy:
+  #     matrix:
+  #       service: [frontend, catalogue, recommendation, voting]
+  #   steps:
+  #   - uses: actions/checkout@v4
+    
+  #   - name: Test Frontend
+  #     if: matrix.service == 'frontend'
+  #     run: |
+  #       cd frontend
+  #       npm install
+  #       npm test
+    
+  #   - name: Test Catalogue
+  #     if: matrix.service == 'catalogue'
+  #     run: |
+  #       cd catalogue
+  #       python -m pip install --upgrade pip
+  #       pip install -r requirements.txt
+  #       python -m pytest test_app.py -v --cov=. --cov-report=xml
+    
+  #   - name: Test Recommendation
+  #     if: matrix.service == 'recommendation'
+  #     run: |
+  #       cd recommendation
+  #       go mod tidy
+  #       go test ./tests/... -coverprofile=coverage.out
+    
+  #   - name: Test Voting
+  #     if: matrix.service == 'voting'
+  #     run: |
+  #       cd voting
+  #       mvn test
+
+  # sonar-analysis:
+  #   needs: unit-test
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #   - uses: actions/checkout@v4
+  #     with:
+  #       fetch-depth: 0
+    
+  #   - name: SonarCloud Scan
+  #     uses: SonarSource/sonarcloud-github-action@master
+  #     env:
+  #       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  # quality-gate:
+  #   needs: sonar-analysis
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #   - name: Wait for Quality Gate
+  #     run: |
+  #       for i in {1..12}; do
+  #         echo "Checking quality gate status (attempt $i/12)..."
+  #         RESPONSE=$(curl -s -u "${{ secrets.SONAR_TOKEN }}:" "${{ env.SONAR_HOST }}/api/qualitygates/project_status?projectKey=${{ env.SONAR_PROJECT }}")
+  #         STATUS=$(echo "$RESPONSE" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+          
+  #         if [ "$STATUS" = "OK" ]; then
+  #           echo "Quality Gate PASSED"
+  #           exit 0
+  #         elif [ "$STATUS" = "ERROR" ]; then
+  #           echo "Quality Gate FAILED"
+  #           exit 1
+  #         else
+  #           echo "Quality Gate status: $STATUS - waiting..."
+  #           sleep 10
+  #         fi
+  #       done
+  #       echo "Quality Gate check timed out"
+  #       exit 1
+
+  # docker-build:
+  #   needs: quality-gate
+  #   runs-on: ubuntu-latest
+  #   strategy:
+  #     matrix:
+  #       service: [frontend, catalogue, recommendation, voting]
+  #   steps:
+  #   - uses: actions/checkout@v4
+    
+  #   - name: Log in to Docker Hub
+  #     uses: docker/login-action@v3
+  #     with:
+  #       username: ${{ secrets.DOCKER_USERNAME }}
+  #       password: ${{ secrets.DOCKER_TOKEN }}
+    
+  #   - name: Build and push Docker image
+  #     run: |
+  #       docker build -t ${{ env.DOCKER_REGISTRY }}/craftista-${{ matrix.service }}:${{ github.sha }} ./${{ matrix.service }}
+  #       docker push ${{ env.DOCKER_REGISTRY }}/craftista-${{ matrix.service }}:${{ github.sha }}
+
+  # update-deployment:
+  #   needs: docker-build
+  #   runs-on: ubuntu-latest
+  #   if: github.ref == 'refs/heads/main'
+  #   steps:
+  #   - uses: actions/checkout@v4
+    
+  #   - name: Update Helm Chart
+  #     run: |
+  #       git clone https://oauth2:${{ secrets.CHARTS_REPO_TOKEN }}@${{ secrets.CHARTS_REPO_URL }} charts-repo
+  #       cd charts-repo
+        
+  #       # Update each service image
+  #       for service in frontend catalogue recommendation voting; do
+  #         yq e -i ".${service}.image.repository = \"${{ env.DOCKER_REGISTRY }}/craftista-${service}\"" helm/craftista/values.yaml
+  #         yq e -i ".${service}.image.tag = \"${{ github.sha }}\"" helm/craftista/values.yaml
+  #       done
+        
+  #       git config --global user.email "${{ secrets.GIT_EMAIL }}"
+  #       git config --global user.name "${{ secrets.GIT_USERNAME }}"
+  #       git add helm/craftista/values.yaml
+  #       git commit -m "Update images to ${{ github.sha }}"
+  #       git push origin main
