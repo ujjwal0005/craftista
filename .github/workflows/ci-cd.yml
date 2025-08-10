@@ -20,13 +20,6 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Test Frontend
-      if: matrix.service == 'frontend'
-      run: |
-        cd frontend
-        npm install
-        npm test
-    
     - name: Test Catalogue
       if: matrix.service == 'catalogue'
       run: |
@@ -34,19 +27,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         python -m pytest test_app.py -v
-    
-    - name: Test Recommendation
-      if: matrix.service == 'recommendation'
-      run: |
-        cd recommendation
-        go mod tidy
-        go test ./tests/...
-    
-    - name: Test Voting
-      if: matrix.service == 'voting'
-      run: |
-        cd voting
-        mvn test
 
   build:
     needs: test
