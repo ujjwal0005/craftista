@@ -1,9 +1,8 @@
 global:
-  registry: docker.io
+  registry: "9861336907"
   repository: craftista
-  tag: latest
+  tag: 77b3f8f2d3e24945e44dbc5957df147cb61a5d68
   pullPolicy: IfNotPresent
-
 frontend:
   enabled: true
   replicaCount: 2
@@ -18,7 +17,6 @@ frontend:
     className: nginx
     host: craftista.local
     path: /
-
 catalogue:
   enabled: true
   replicaCount: 2
@@ -28,7 +26,6 @@ catalogue:
   service:
     type: ClusterIP
     port: 5000
-
 recommendation:
   enabled: true
   replicaCount: 2
@@ -38,7 +35,6 @@ recommendation:
   service:
     type: ClusterIP
     port: 8080
-
 voting:
   enabled: true
   replicaCount: 2
@@ -48,7 +44,6 @@ voting:
   service:
     type: ClusterIP
     port: 8080
-
 database:
   enabled: true
   image:
@@ -60,7 +55,6 @@ database:
     POSTGRES_USER: devops
     POSTGRES_PASSWORD: devops
     POSTGRES_DB: catalogue
-
 resources:
   limits:
     cpu: 500m
@@ -68,7 +62,6 @@ resources:
   requests:
     cpu: 250m
     memory: 256Mi
-
 nodeSelector: {}
 tolerations: []
 affinity: {}
