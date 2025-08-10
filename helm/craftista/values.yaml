@@ -1,6 +1,6 @@
 global:
-  registry: ghcr.io
-  repository: craftista/craftista
+  registry: docker.io
+  repository: craftista
   tag: latest
   pullPolicy: IfNotPresent
 

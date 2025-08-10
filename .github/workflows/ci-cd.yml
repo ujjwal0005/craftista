@@ -231,26 +231,24 @@ jobs:
       with:
         sarif_file: 'trivy-results-${{ matrix.service }}.sarif'
 
-  # update-deployment:
-  #   needs: docker-build
-  #   runs-on: ubuntu-latest
-  #   if: github.ref == 'refs/heads/main'
-  #   steps:
-  #   - uses: actions/checkout@v4
+  update-deployment:
+    needs: trivy-scan
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
     
-  #   - name: Update Helm Chart
-  #     run: |
-  #       git clone https://oauth2:${{ secrets.CHARTS_REPO_TOKEN }}@${{ secrets.CHARTS_REPO_URL }} charts-repo
-  #       cd charts-repo
+    - name: Update Helm Chart
+      run: |
+        # Update global registry and tag in same repo
+        yq e -i '.global.registry = "${{ env.DOCKER_REGISTRY }}"' helm/craftista/values.yaml
+        yq e -i '.global.repository = "craftista"' helm/craftista/values.yaml
+        yq e -i '.global.tag = "${{ github.sha }}"' helm/craftista/values.yaml
         
-  #       # Update each service image
-  #       for service in frontend catalogue recommendation voting; do
-  #         yq e -i ".${service}.image.repository = \"${{ env.DOCKER_REGISTRY }}/craftista-${service}\"" helm/craftista/values.yaml
-  #         yq e -i ".${service}.image.tag = \"${{ github.sha }}\"" helm/craftista/values.yaml
-  #       done
-        
-  #       git config --global user.email "${{ secrets.GIT_EMAIL }}"
-  #       git config --global user.name "${{ secrets.GIT_USERNAME }}"
-  #       git add helm/craftista/values.yaml
-  #       git commit -m "Update images to ${{ github.sha }}"
-  #       git push origin main
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git config --global user.name "github-actions[bot]"
+        git add helm/craftista/values.yaml
+        git commit -m "Update image tag to ${{ github.sha }}"
+        git push origin main
