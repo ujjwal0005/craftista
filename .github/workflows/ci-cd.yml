@@ -146,44 +146,67 @@ jobs:
       uses: aquasecurity/trivy-action@master
       with:
         image-ref: ${{ env.DOCKER_REGISTRY }}/craftista-${{ matrix.service }}:${{ github.sha }}
-        format: 'sarif'
-        output: 'trivy-results-${{ matrix.service }}.sarif'
+        format: 'json'
+        output: 'trivy-results-${{ matrix.service }}.json'
+    
+    - name: Parse Trivy results and send to Slack
+      run: |
+        CRITICAL=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' trivy-results-${{ matrix.service }}.json || echo 0)
+        HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' trivy-results-${{ matrix.service }}.json || echo 0)
+        MEDIUM=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length' trivy-results-${{ matrix.service }}.json || echo 0)
+        LOW=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="LOW")] | length' trivy-results-${{ matrix.service }}.json || echo 0)
+        
+        if [ "$CRITICAL" -gt 0 ] || [ "$HIGH" -gt 0 ]; then
+          COLOR="danger"
+        elif [ "$MEDIUM" -gt 0 ]; then
+          COLOR="warning"
+        else
+          COLOR="good"
+        fi
+        
+        curl -X POST -H 'Content-type: application/json' \
+        --data "{
+          \"text\": \"🔍 Trivy Security Scan Results for ${{ matrix.service }}\",
+          \"attachments\": [{
+            \"color\": \"$COLOR\",
+            \"fields\": [{
+              \"title\": \"Service\",
+              \"value\": \"${{ matrix.service }}\",
+              \"short\": true
+            }, {
+              \"title\": \"Image\",
+              \"value\": \"${{ env.DOCKER_REGISTRY }}/craftista-${{ matrix.service }}:${{ github.sha }}\",
+              \"short\": true
+            }, {
+              \"title\": \"🔴 Critical\",
+              \"value\": \"$CRITICAL\",
+              \"short\": true
+            }, {
+              \"title\": \"🟠 High\",
+              \"value\": \"$HIGH\",
+              \"short\": true
+            }, {
+              \"title\": \"🟡 Medium\",
+              \"value\": \"$MEDIUM\",
+              \"short\": true
+            }, {
+              \"title\": \"🔵 Low\",
+              \"value\": \"$LOW\",
+              \"short\": true
+            }]
+          }]
+        }" \
+        ${{ secrets.SLACK_WEBHOOK_URL }}
+    
+    - name: Convert JSON to SARIF and upload
+      run: |
+        # Convert JSON to SARIF format for GitHub upload
+        trivy convert --format sarif --output trivy-results-${{ matrix.service }}.sarif trivy-results-${{ matrix.service }}.json
     
     - name: Upload Trivy scan results
       uses: github/codeql-action/upload-sarif@v2
       with:
         sarif_file: 'trivy-results-${{ matrix.service }}.sarif'
-    
-    - name: Send Trivy results to Slack
-      uses: 8398a7/action-slack@v3
-      with:
-        status: custom
-        custom_payload: |
-          {
-            "text": "Trivy Security Scan Results for ${{ matrix.service }}",
-            "attachments": [{
-              "color": "warning",
-              "fields": [{
-                "title": "Service",
-                "value": "${{ matrix.service }}",
-                "short": true
-              }, {
-                "title": "Image",
-                "value": "${{ env.DOCKER_REGISTRY }}/craftista-${{ matrix.service }}:${{ github.sha }}",
-                "short": true
-              }, {
-                "title": "Repository",
-                "value": "${{ github.repository }}",
-                "short": true
-              }, {
-                "title": "Branch",
-                "value": "${{ github.ref_name }}",
-                "short": true
-              }]
-            }]
-          }
-      env:
-        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
   # update-deployment:
   #   needs: docker-build
