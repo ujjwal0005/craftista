@@ -136,8 +136,73 @@ jobs:
         }" \
         ${{ secrets.SLACK_WEBHOOK_URL }}
 
-  docker-build:
+  owasp-dependency-check:
     needs: sonar-analysis
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [frontend, catalogue, recommendation, voting]
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Run OWASP Dependency Check
+      uses: dependency-check/Dependency-Check_Action@main
+      with:
+        project: 'craftista-${{ matrix.service }}'
+        path: './${{ matrix.service }}'
+        format: 'JSON'
+        out: 'dependency-check-report'
+      continue-on-error: true
+    
+    - name: Parse OWASP Dependency Check results and send to Slack
+      run: |
+        if [ -f "dependency-check-report/dependency-check-report.json" ]; then
+          CRITICAL=$(jq '[.dependencies[]?.vulnerabilities[]? | select(.severity=="CRITICAL")] | length' dependency-check-report/dependency-check-report.json || echo 0)
+          HIGH=$(jq '[.dependencies[]?.vulnerabilities[]? | select(.severity=="HIGH")] | length' dependency-check-report/dependency-check-report.json || echo 0)
+          MEDIUM=$(jq '[.dependencies[]?.vulnerabilities[]? | select(.severity=="MEDIUM")] | length' dependency-check-report/dependency-check-report.json || echo 0)
+          LOW=$(jq '[.dependencies[]?.vulnerabilities[]? | select(.severity=="LOW")] | length' dependency-check-report/dependency-check-report.json || echo 0)
+          
+          if [ "$CRITICAL" -gt 0 ] || [ "$HIGH" -gt 0 ]; then
+            COLOR="danger"
+          elif [ "$MEDIUM" -gt 0 ]; then
+            COLOR="warning"
+          else
+            COLOR="good"
+          fi
+          
+          curl -X POST -H 'Content-type: application/json' \
+          --data "{
+            \"text\": \"🔒 OWASP Dependency Check for ${{ matrix.service }}\",
+            \"attachments\": [{
+              \"color\": \"$COLOR\",
+              \"fields\": [{
+                \"title\": \"Service\",
+                \"value\": \"${{ matrix.service }}\",
+                \"short\": true
+              }, {
+                \"title\": \"🔴 Critical\",
+                \"value\": \"$CRITICAL\",
+                \"short\": true
+              }, {
+                \"title\": \"🟠 High\",
+                \"value\": \"$HIGH\",
+                \"short\": true
+              }, {
+                \"title\": \"🟡 Medium\",
+                \"value\": \"$MEDIUM\",
+                \"short\": true
+              }, {
+                \"title\": \"🔵 Low\",
+                \"value\": \"$LOW\",
+                \"short\": true
+              }]
+            }]
+          }" \
+          ${{ secrets.SLACK_WEBHOOK_URL }}
+        fi
+
+  docker-build:
+    needs: owasp-dependency-check
     runs-on: ubuntu-latest
     strategy:
       matrix:
