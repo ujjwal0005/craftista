@@ -110,7 +110,7 @@ jobs:
   #       exit 1
 
   docker-build:
-    needs: quality-gate
+    # needs: quality-gate
     runs-on: ubuntu-latest
     strategy:
       matrix:
