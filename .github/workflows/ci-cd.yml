@@ -73,6 +73,11 @@ jobs:
       with:
         fetch-depth: 0
     
+    - name: Build Java classes
+      run: |
+        cd voting
+        mvn clean compile test-compile
+    
     - name: SonarCloud Scan
       uses: SonarSource/sonarcloud-github-action@master
       env:
