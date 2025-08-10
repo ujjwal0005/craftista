@@ -83,6 +83,37 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    
+    - name: Send SonarCloud results to Slack
+      uses: 8398a7/action-slack@v3
+      with:
+        status: custom
+        custom_payload: |
+          {
+            "text": "SonarCloud Analysis Complete",
+            "attachments": [{
+              "color": "good",
+              "fields": [{
+                "title": "Project",
+                "value": "${{ env.SONAR_PROJECT }}",
+                "short": true
+              }, {
+                "title": "Repository",
+                "value": "${{ github.repository }}",
+                "short": true
+              }, {
+                "title": "Branch",
+                "value": "${{ github.ref_name }}",
+                "short": true
+              }, {
+                "title": "View Report",
+                "value": "<${{ env.SONAR_HOST }}/dashboard?id=${{ env.SONAR_PROJECT }}|SonarCloud Dashboard>",
+                "short": false
+              }]
+            }]
+          }
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
   docker-build:
     needs: sonar-analysis
@@ -122,6 +153,37 @@ jobs:
       uses: github/codeql-action/upload-sarif@v2
       with:
         sarif_file: 'trivy-results-${{ matrix.service }}.sarif'
+    
+    - name: Send Trivy results to Slack
+      uses: 8398a7/action-slack@v3
+      with:
+        status: custom
+        custom_payload: |
+          {
+            "text": "Trivy Security Scan Results for ${{ matrix.service }}",
+            "attachments": [{
+              "color": "warning",
+              "fields": [{
+                "title": "Service",
+                "value": "${{ matrix.service }}",
+                "short": true
+              }, {
+                "title": "Image",
+                "value": "${{ env.DOCKER_REGISTRY }}/craftista-${{ matrix.service }}:${{ github.sha }}",
+                "short": true
+              }, {
+                "title": "Repository",
+                "value": "${{ github.repository }}",
+                "short": true
+              }, {
+                "title": "Branch",
+                "value": "${{ github.ref_name }}",
+                "short": true
+              }]
+            }]
+          }
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
   # update-deployment:
   #   needs: docker-build
