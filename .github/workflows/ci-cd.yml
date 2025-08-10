@@ -84,30 +84,30 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-  # quality-gate:
-  #   needs: sonar-analysis
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #   - name: Wait for Quality Gate
-  #     run: |
-  #       for i in {1..12}; do
-  #         echo "Checking quality gate status (attempt $i/12)..."
-  #         RESPONSE=$(curl -s -u "${{ secrets.SONAR_TOKEN }}:" "${{ env.SONAR_HOST }}/api/qualitygates/project_status?projectKey=${{ env.SONAR_PROJECT }}")
-  #         STATUS=$(echo "$RESPONSE" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+  quality-gate:
+    needs: sonar-analysis
+    runs-on: ubuntu-latest
+    steps:
+    - name: Wait for Quality Gate
+      run: |
+        for i in {1..12}; do
+          echo "Checking quality gate status (attempt $i/12)..."
+          RESPONSE=$(curl -s -u "${{ secrets.SONAR_TOKEN }}:" "${{ env.SONAR_HOST }}/api/qualitygates/project_status?projectKey=${{ env.SONAR_PROJECT }}")
+          STATUS=$(echo "$RESPONSE" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
           
-  #         if [ "$STATUS" = "OK" ]; then
-  #           echo "Quality Gate PASSED"
-  #           exit 0
-  #         elif [ "$STATUS" = "ERROR" ]; then
-  #           echo "Quality Gate FAILED"
-  #           exit 1
-  #         else
-  #           echo "Quality Gate status: $STATUS - waiting..."
-  #           sleep 10
-  #         fi
-  #       done
-  #       echo "Quality Gate check timed out"
-  #       exit 1
+          if [ "$STATUS" = "OK" ]; then
+            echo "Quality Gate PASSED"
+            exit 0
+          elif [ "$STATUS" = "ERROR" ]; then
+            echo "Quality Gate FAILED"
+            exit 1
+          else
+            echo "Quality Gate status: $STATUS - waiting..."
+            sleep 10
+          fi
+        done
+        echo "Quality Gate check timed out"
+        exit 1
 
   # docker-build:
   #   needs: quality-gate
