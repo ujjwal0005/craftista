@@ -1,7 +1,7 @@
 global:
   registry: "9861336907"
   repository: craftista
-  tag: 2f62ebfb45dbdfcb24e7c08137a84d8b645a5a07
+  tag: 0e66c81f4dc2647e3cb7d136c32b39eb3bbd8ebb
   pullPolicy: IfNotPresent
 frontend:
   enabled: true
