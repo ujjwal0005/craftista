@@ -167,7 +167,18 @@ jobs:
       run: |
         echo "Checking for OWASP report files..."
         ls -la dependency-check-report/ || echo "No dependency-check-report directory"
-        find . -name "*.json" -type f || echo "No JSON files found"
+        if [ -f "dependency-check-report/dependency-check-report.json" ]; then
+          echo "Report content:"
+          cat dependency-check-report/dependency-check-report.json | jq .
+        fi
+        
+        # Alternative: Use npm audit for Node.js
+        if [ "${{ matrix.service }}" = "frontend" ]; then
+          cd frontend
+          npm audit --json > ../npm-audit.json || true
+          echo "NPM Audit results:"
+          cat ../npm-audit.json | jq '.vulnerabilities | length'
+        fi
     
     - name: Parse OWASP results and send to Slack
       run: |
