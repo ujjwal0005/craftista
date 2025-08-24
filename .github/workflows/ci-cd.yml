@@ -160,52 +160,75 @@ jobs:
         out: 'dependency-check-report'
       continue-on-error: true
     
+    - name: Debug OWASP report
+      run: |
+        echo "Checking for OWASP report files..."
+        ls -la dependency-check-report/ || echo "No dependency-check-report directory"
+        find . -name "*.json" -type f || echo "No JSON files found"
+    
     - name: Parse OWASP results and send to Slack
       run: |
+        # Always send notification regardless of report existence
+        REPORT_EXISTS="false"
+        CRITICAL=0
+        HIGH=0
+        MEDIUM=0
+        LOW=0
+        
         if [ -f "dependency-check-report/dependency-check-report.json" ]; then
-          CRITICAL=$(jq '[.dependencies[]?.vulnerabilities[]? | select(.severity=="CRITICAL")] | length' dependency-check-report/dependency-check-report.json || echo 0)
-          HIGH=$(jq '[.dependencies[]?.vulnerabilities[]? | select(.severity=="HIGH")] | length' dependency-check-report/dependency-check-report.json || echo 0)
-          MEDIUM=$(jq '[.dependencies[]?.vulnerabilities[]? | select(.severity=="MEDIUM")] | length' dependency-check-report/dependency-check-report.json || echo 0)
-          LOW=$(jq '[.dependencies[]?.vulnerabilities[]? | select(.severity=="LOW")] | length' dependency-check-report/dependency-check-report.json || echo 0)
-          
-          if [ "$CRITICAL" -gt 0 ] || [ "$HIGH" -gt 0 ]; then
-            COLOR="danger"
-          elif [ "$MEDIUM" -gt 0 ]; then
-            COLOR="warning"
-          else
-            COLOR="good"
-          fi
-          
-          curl -X POST -H 'Content-type: application/json' \
-          --data "{
-            \"text\": \"🔒 OWASP Dependency Check for ${{ matrix.service }}\",
-            \"attachments\": [{
-              \"color\": \"$COLOR\",
-              \"fields\": [{
-                \"title\": \"Service\",
-                \"value\": \"${{ matrix.service }}\",
-                \"short\": true
-              }, {
-                \"title\": \"🔴 Critical\",
-                \"value\": \"$CRITICAL\",
-                \"short\": true
-              }, {
-                \"title\": \"🟠 High\",
-                \"value\": \"$HIGH\",
-                \"short\": true
-              }, {
-                \"title\": \"🟡 Medium\",
-                \"value\": \"$MEDIUM\",
-                \"short\": true
-              }, {
-                \"title\": \"🔵 Low\",
-                \"value\": \"$LOW\",
-                \"short\": true
-              }]
-            }]
-          }" \
-          ${{ secrets.SLACK_WEBHOOK_URL }}
+          REPORT_EXISTS="true"
+          CRITICAL=$(jq '[.dependencies[]?.vulnerabilities[]? | select(.severity=="CRITICAL")] | length' dependency-check-report/dependency-check-report.json 2>/dev/null || echo 0)
+          HIGH=$(jq '[.dependencies[]?.vulnerabilities[]? | select(.severity=="HIGH")] | length' dependency-check-report/dependency-check-report.json 2>/dev/null || echo 0)
+          MEDIUM=$(jq '[.dependencies[]?.vulnerabilities[]? | select(.severity=="MEDIUM")] | length' dependency-check-report/dependency-check-report.json 2>/dev/null || echo 0)
+          LOW=$(jq '[.dependencies[]?.vulnerabilities[]? | select(.severity=="LOW")] | length' dependency-check-report/dependency-check-report.json 2>/dev/null || echo 0)
         fi
+        
+        if [ "$CRITICAL" -gt 0 ] || [ "$HIGH" -gt 0 ]; then
+          COLOR="danger"
+        elif [ "$MEDIUM" -gt 0 ]; then
+          COLOR="warning"
+        else
+          COLOR="good"
+        fi
+        
+        STATUS_MSG="Report found: $REPORT_EXISTS"
+        if [ "$REPORT_EXISTS" = "false" ]; then
+          STATUS_MSG="No vulnerabilities found or scan failed"
+        fi
+        
+        curl -X POST -H 'Content-type: application/json' \
+        --data "{
+          \"text\": \"🔒 OWASP Dependency Check for ${{ matrix.service }}\",
+          \"attachments\": [{
+            \"color\": \"$COLOR\",
+            \"fields\": [{
+              \"title\": \"Service\",
+              \"value\": \"${{ matrix.service }}\",
+              \"short\": true
+            }, {
+              \"title\": \"Status\",
+              \"value\": \"$STATUS_MSG\",
+              \"short\": true
+            }, {
+              \"title\": \"🔴 Critical\",
+              \"value\": \"$CRITICAL\",
+              \"short\": true
+            }, {
+              \"title\": \"🟠 High\",
+              \"value\": \"$HIGH\",
+              \"short\": true
+            }, {
+              \"title\": \"🟡 Medium\",
+              \"value\": \"$MEDIUM\",
+              \"short\": true
+            }, {
+              \"title\": \"🔵 Low\",
+              \"value\": \"$LOW\",
+              \"short\": true
+            }]
+          }]
+        }" \
+        ${{ secrets.SLACK_WEBHOOK_URL }}
 
   docker-build:
     needs: owasp-dependency-check
