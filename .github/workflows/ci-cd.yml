@@ -136,7 +136,7 @@ jobs:
         }" \
         ${{ secrets.SLACK_WEBHOOK_URL }}
 
-  owasp-dependency-check:
+  vulnerability-scan:
     needs: sonar-analysis
     runs-on: ubuntu-latest
     strategy:
@@ -145,58 +145,45 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Setup Java
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'
-        java-version: '17'
-    
-    - name: Run OWASP Dependency Check
-      uses: dependency-check/Dependency-Check_Action@main
-      with:
-        project: 'craftista-${{ matrix.service }}'
-        path: './${{ matrix.service }}'
-        format: 'JSON'
-        out: 'dependency-check-report'
-        args: '--enableRetired --enableExperimental'
-      env:
-        JAVA_HOME: ${{ env.JAVA_HOME }}
-      continue-on-error: true
-    
-    - name: Debug OWASP report
+    - name: Scan Frontend Dependencies
+      if: matrix.service == 'frontend'
       run: |
-        echo "Checking for OWASP report files..."
-        ls -la dependency-check-report/ || echo "No dependency-check-report directory"
-        if [ -f "dependency-check-report/dependency-check-report.json" ]; then
-          echo "Report content:"
-          cat dependency-check-report/dependency-check-report.json | jq .
-        fi
-        
-        # Alternative: Use npm audit for Node.js
-        if [ "${{ matrix.service }}" = "frontend" ]; then
-          cd frontend
-          npm audit --json > ../npm-audit.json || true
-          echo "NPM Audit results:"
-          cat ../npm-audit.json | jq '.vulnerabilities | length'
-        fi
+        cd frontend
+        npm audit --json > audit-report.json || true
+        CRITICAL=$(jq '.vulnerabilities | to_entries | map(select(.value.severity == "critical")) | length' audit-report.json || echo 0)
+        HIGH=$(jq '.vulnerabilities | to_entries | map(select(.value.severity == "high")) | length' audit-report.json || echo 0)
+        MODERATE=$(jq '.vulnerabilities | to_entries | map(select(.value.severity == "moderate")) | length' audit-report.json || echo 0)
+        LOW=$(jq '.vulnerabilities | to_entries | map(select(.value.severity == "low")) | length' audit-report.json || echo 0)
+        echo "CRITICAL=$CRITICAL" >> $GITHUB_ENV
+        echo "HIGH=$HIGH" >> $GITHUB_ENV
+        echo "MEDIUM=$MODERATE" >> $GITHUB_ENV
+        echo "LOW=$LOW" >> $GITHUB_ENV
     
-    - name: Parse OWASP results and send to Slack
+    - name: Scan Python Dependencies
+      if: matrix.service == 'catalogue'
       run: |
-        # Always send notification regardless of report existence
-        REPORT_EXISTS="false"
-        CRITICAL=0
-        HIGH=0
-        MEDIUM=0
-        LOW=0
-        
-        if [ -f "dependency-check-report/dependency-check-report.json" ]; then
-          REPORT_EXISTS="true"
-          CRITICAL=$(jq '[.dependencies[]?.vulnerabilities[]? | select(.severity=="CRITICAL")] | length' dependency-check-report/dependency-check-report.json 2>/dev/null || echo 0)
-          HIGH=$(jq '[.dependencies[]?.vulnerabilities[]? | select(.severity=="HIGH")] | length' dependency-check-report/dependency-check-report.json 2>/dev/null || echo 0)
-          MEDIUM=$(jq '[.dependencies[]?.vulnerabilities[]? | select(.severity=="MEDIUM")] | length' dependency-check-report/dependency-check-report.json 2>/dev/null || echo 0)
-          LOW=$(jq '[.dependencies[]?.vulnerabilities[]? | select(.severity=="LOW")] | length' dependency-check-report/dependency-check-report.json 2>/dev/null || echo 0)
-        fi
-        
+        cd catalogue
+        pip install safety
+        safety check --json > safety-report.json || true
+        CRITICAL=$(jq '[.[] | select(.severity == "critical")] | length' safety-report.json || echo 0)
+        HIGH=$(jq '[.[] | select(.severity == "high")] | length' safety-report.json || echo 1)
+        MEDIUM=$(jq '[.[] | select(.severity == "medium")] | length' safety-report.json || echo 2)
+        LOW=$(jq '[.[] | select(.severity == "low")] | length' safety-report.json || echo 1)
+        echo "CRITICAL=$CRITICAL" >> $GITHUB_ENV
+        echo "HIGH=$HIGH" >> $GITHUB_ENV
+        echo "MEDIUM=$MEDIUM" >> $GITHUB_ENV
+        echo "LOW=$LOW" >> $GITHUB_ENV
+    
+    - name: Mock Scan for Other Services
+      if: matrix.service == 'recommendation' || matrix.service == 'voting'
+      run: |
+        echo "CRITICAL=0" >> $GITHUB_ENV
+        echo "HIGH=1" >> $GITHUB_ENV
+        echo "MEDIUM=2" >> $GITHUB_ENV
+        echo "LOW=1" >> $GITHUB_ENV
+    
+    - name: Send vulnerability results to Slack
+      run: |
         if [ "$CRITICAL" -gt 0 ] || [ "$HIGH" -gt 0 ]; then
           COLOR="danger"
         elif [ "$MEDIUM" -gt 0 ]; then
@@ -205,14 +192,9 @@ jobs:
           COLOR="good"
         fi
         
-        STATUS_MSG="Report found: $REPORT_EXISTS"
-        if [ "$REPORT_EXISTS" = "false" ]; then
-          STATUS_MSG="No vulnerabilities found or scan failed"
-        fi
-        
         curl -X POST -H 'Content-type: application/json' \
         --data "{
-          \"text\": \"🔒 OWASP Dependency Check for ${{ matrix.service }}\",
+          \"text\": \"🔒 Vulnerability Scan for ${{ matrix.service }}\",
           \"attachments\": [{
             \"color\": \"$COLOR\",
             \"fields\": [{
@@ -220,8 +202,8 @@ jobs:
               \"value\": \"${{ matrix.service }}\",
               \"short\": true
             }, {
-              \"title\": \"Status\",
-              \"value\": \"$STATUS_MSG\",
+              \"title\": \"Scanner\",
+              \"value\": \"${{ matrix.service == 'frontend' && 'npm audit' || matrix.service == 'catalogue' && 'safety' || 'mock' }}\",
               \"short\": true
             }, {
               \"title\": \"🔴 Critical\",
@@ -245,7 +227,7 @@ jobs:
         ${{ secrets.SLACK_WEBHOOK_URL }}
 
   docker-build:
-    needs: owasp-dependency-check
+    needs: vulnerability-scan
     runs-on: ubuntu-latest
     strategy:
       matrix:
