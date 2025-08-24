@@ -6,4 +6,5 @@ psycopg2-binary
 pytest
 pytest-cov
 django==1.6
-pillow==8.2.0
+jinja2==2.10.1
+pyyaml==5.3.1
