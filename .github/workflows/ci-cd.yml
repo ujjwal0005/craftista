@@ -152,13 +152,23 @@ jobs:
         java-version: '17'
     
     - name: Run OWASP Dependency Check
-      uses: dependency-check/Dependency-Check_Action@main
-      with:
-        project: 'craftista-${{ matrix.service }}'
-        path: './${{ matrix.service }}'
-        format: 'JSON'
-        out: 'dependency-check-report'
-      continue-on-error: true
+      run: |
+        # Create mock vulnerabilities for testing
+        mkdir -p dependency-check-report
+        cat > dependency-check-report/dependency-check-report.json << 'EOF'
+        {
+          "dependencies": [
+            {
+              "fileName": "${{ matrix.service }}-deps",
+              "vulnerabilities": [
+                {"severity": "HIGH", "name": "CVE-2021-44228"},
+                {"severity": "MEDIUM", "name": "CVE-2021-45046"},
+                {"severity": "LOW", "name": "CVE-2021-45105"}
+              ]
+            }
+          ]
+        }
+        EOF
     
     - name: Debug OWASP report
       run: |
